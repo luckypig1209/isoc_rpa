@@ -1,3 +1,7 @@
-selenium
-requests
+selenium>=4.0.0
+pillow
+opencv-python
 pyyaml
+requests
+urllib3
+numpy
