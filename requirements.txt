@@ -1,3 +1,13 @@
+<<<<<<< HEAD
 selenium
 requests
 pyyaml
+=======
+selenium>=4.0.0
+pillow
+opencv-python
+pyyaml
+requests
+urllib3
+numpy
+>>>>>>> parent of 1242e49 (删除历史图片)

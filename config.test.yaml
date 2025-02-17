@@ -1,0 +1,82 @@
+targets:
+  - name: ybiframe
+    url: http://132.254.207.138:38080/yitu/index.html#/chart/publishShort/1hx7yh60big000
+    open-wait-secs: 60
+    elements-check:
+      - type: iframe
+        locator:
+          type: css-selector
+          value: "#h74i8m87jvc00 iframe"
+        capture:
+          x: 570
+          y: 390
+          width: 890
+          height: 830
+  - name: dsjiframe
+    url: http://132.254.207.138:38080/yitu/index.html#/chart/publishShort/48ydcb79222000
+    open-wait-secs: 60
+    elements-check:
+      - type: iframe
+        locator:
+          type: css-selector
+          value: "#h74i8m87jvc00 iframe"
+        capture:
+          x: 570
+          y: 395
+          width: 890
+          height: 830
+  - name: tciframe
+    url: http://132.254.207.138:38080/yitu/index.html#/chart/publishShort/2bmkieuyofok00
+    open-wait-secs: 60
+    elements-check:
+      - type: iframe
+        locator:
+          type: css-selector
+          value: "#h74i8m87jvc00 iframe"
+        capture:
+          x: 570
+          y: 400
+          width: 890
+          height: 830
+  - name: gatiframe
+    url: http://132.254.207.138:38080/yitu/index.html#/chart/publishShort/3x16et99f60000
+    open-wait-secs: 60
+    elements-check:
+      - type: iframe # iframe, element, video
+        locator:
+          type: css-selector # id, xpath
+          value: "#h74i8m87jvc00 iframe" #app video.cool-video
+        capture:
+          x: 570
+          y: 400
+          width: 890
+          height: 830
+  - name: wltiframe
+    url: http://132.252.100.92:8088/#/share/a87039032dcc41abb1d045950be1d7ef
+    open-wait-secs: 60
+    elements-check:
+#      - type: iframe # iframe, element, video
+#        locator:
+#          type: css-selector # id, xpath
+#          value: "#h74i8m87jvc00 iframe" #app video.cool-video
+  - name: gyiframe
+    url: http://132.254.207.138:38080/yitu/index.html#/chart/publishShort/ba95d0yijwo00
+    open-wait-secs: 60
+    elements-check:
+      - type: iframe # iframe, element, video
+        locator:
+          type: css-selector # id, xpath
+          value: "#\\31whtzve5qo3k00 iframe" #app video.cool-video
+        capture:
+          x: 620
+          y: 420
+          width: 850
+          height: 800
+  - name: abaaba
+    url: http://132.254.207.138:38080/yitu/index.html#/chart/publish/MTg3MzUyOTkzNDQwNjc5NTI2Ng==/MTg3MzUyOTkzNDU0NTIwNzI5Nw==/MTczNTU0OTY1MzQyNg==
+    open-wait-secs: 10
+    elements-check:
+      - type: video # iframe, element
+        locator:
+          type: css-selector # id, xpath
+          value: "#app video.cool-video" #app video.cool-video
