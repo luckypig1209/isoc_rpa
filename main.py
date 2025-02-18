@@ -78,12 +78,14 @@ except yaml.YAMLError as e:
 
 
 options = OptionsChrome()
-
-# options.headless = True
-# options.add_argument("--headless=new")
-options = OptionsChrome()
+options.add_argument('--headless=new')  # 启用新版headless模式
+options.add_argument('--no-sandbox')
+options.add_argument('--disable-dev-shm-usage')
+options.add_argument('--disable-gpu')
+options.add_argument('--window-size=1920,1080')  # 设置固定窗口大小
 options.add_argument('--ignore-certificate-errors')
-driver = webdriver.Chrome(service=Service(executable_path="C:\\Mac\\Home\\Desktop\\isoc_rpa\\chromedriver.exe"), options=options)
+
+driver = webdriver.Chrome(options=options)  # 在Docker中不需要指定executable_path
 
 def cleanup_old_backups(history_dir: str, days: int = 5):
     """清理指定天数之前的备份文件"""
@@ -119,6 +121,29 @@ timestamp = datetime.now().strftime('%Y%m%d-%H%M')
 backup_dir = os.path.join(os.getcwd(), '.history', timestamp)
 if not os.path.exists(backup_dir):
     os.makedirs(backup_dir)
+
+def calculate_capture_coordinates(capture_config, window_size):
+    """计算实际的截图坐标"""
+    if capture_config.get('relative', False):
+        # 获取窗口尺寸
+        width = window_size['width']
+        height = window_size['height']
+        
+        # 计算实际坐标
+        return {
+            'x': int(width * capture_config['x_percent']),
+            'y': int(height * capture_config['y_percent']),
+            'width': int(width * capture_config['width_percent']),
+            'height': int(height * capture_config['height_percent'])
+        }
+    else:
+        # 使用绝对坐标
+        return {
+            'x': round(float(capture_config['x'])),
+            'y': round(float(capture_config['y'])),
+            'width': round(float(capture_config['width'])),
+            'height': round(float(capture_config['height']))
+        }
 
 def take_screenshot(driver, target: any) -> tuple[bool, str, str, str, str, float]:
     """
@@ -209,22 +234,20 @@ def take_screenshot(driver, target: any) -> tuple[bool, str, str, str, str, floa
                         break
                 
                 if capture_config:
-                    # 使用配置的区域进行截图
+                    # 获取窗口尺寸
+                    window_size = driver.get_window_size()
+                    
+                    # 计算实际截图坐标
+                    capture_coords = calculate_capture_coordinates(capture_config, window_size)
+                    
+                    # 使用计算后的坐标进行截图
                     full_image = Image.open(io.BytesIO(full_img))
                     
-                    # 确保坐标值为整数，并保持精确的位置
-                    x = round(float(capture_config['x']))
-                    y = round(float(capture_config['y']))
-                    width = round(float(capture_config['width']))
-                    height = round(float(capture_config['height']))
-                    
-                    print(f"Cropping image for {target_name} at: x={x}, y={y}, width={width}, height={height}")
-                    
                     iframe_image = full_image.crop((
-                        x,
-                        y,
-                        x + width,
-                        y + height
+                        capture_coords['x'],
+                        capture_coords['y'],
+                        capture_coords['x'] + capture_coords['width'],
+                        capture_coords['y'] + capture_coords['height']
                     ))
                     
                     # 转换为base64

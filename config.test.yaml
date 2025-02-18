@@ -8,10 +8,11 @@ targets:
           type: css-selector
           value: "#h74i8m87jvc00 iframe"
         capture:
-          x: 570
-          y: 390
-          width: 890
-          height: 830
+          relative: true
+          x_percent: 0.297
+          y_percent: 0.361
+          width_percent: 0.463
+          height_percent: 0.769
   - name: dsjiframe
     url: http://132.254.207.138:38080/yitu/index.html#/chart/publishShort/48ydcb79222000
     open-wait-secs: 60
