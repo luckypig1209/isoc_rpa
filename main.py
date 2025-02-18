@@ -19,6 +19,8 @@ import cv2
 import numpy as np
 import glob
 import urllib3
+from PIL import Image
+import io
 
 # 在脚本开始处添加以下代码，禁用SSL警告
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -192,7 +194,7 @@ def take_screenshot(driver, target: any) -> tuple[bool, str, str, str, str, floa
         full_b64_ding = "data:image/png;base64," + full_b64_wx
 
         # 发送全页面截图到钉钉
-        DinghatSendImg(full_b64_ding, "1183")
+        # DinghatSendImg(full_b64_ding, "1183")
         
         # iframe部分截图
         iframe_b64_wx = ""
@@ -208,8 +210,6 @@ def take_screenshot(driver, target: any) -> tuple[bool, str, str, str, str, floa
                 
                 if capture_config:
                     # 使用配置的区域进行截图
-                    from PIL import Image
-                    import io
                     full_image = Image.open(io.BytesIO(full_img))
                     
                     # 确保坐标值为整数，并保持精确的位置
@@ -384,8 +384,74 @@ def compare_images_sift(img1_path: str, img2_path: str) -> float:
     similarity = len(good_matches) / max(len(kp1), len(kp2))
     return similarity
 
-def screenshot_it(target: any):
-    """截图主函数，包含重试逻辑"""
+def combine_images(images_data: list, titles: list = None) -> str:
+    """
+    将多张图片垂直合并成一张图片，并返回base64编码
+    images_data: 图片数据列表，每个元素可以是PIL Image对象或base64字符串
+    titles: 图片标题列表，如果提供则会在每张图片上方添加标题
+    """
+    # 转换所有图片为PIL Image对象
+    pil_images = []
+    for img_data in images_data:
+        if isinstance(img_data, str) and img_data.startswith('data:image'):
+            # 处理base64格式的图片
+            img_data = img_data.split('base64,')[1]
+            img_bytes = base64.b64decode(img_data)
+            img = Image.open(io.BytesIO(img_bytes))
+        elif isinstance(img_data, str):
+            # 处理普通base64格式
+            img_bytes = base64.b64decode(img_data)
+            img = Image.open(io.BytesIO(img_bytes))
+        elif isinstance(img_data, Image.Image):
+            img = img_data
+        else:
+            img_bytes = img_data
+            img = Image.open(io.BytesIO(img_bytes))
+        pil_images.append(img)
+
+    # 计算合并后图片的尺寸
+    max_width = max(img.width for img in pil_images)
+    total_height = sum(img.height for img in pil_images)
+    
+    # 如果有标题，为每个标题预留空间
+    title_height = 30 if titles else 0
+    total_height += len(pil_images) * title_height
+
+    # 创建新图片
+    combined_image = Image.new('RGB', (max_width, total_height), 'white')
+    
+    # 绘制图片和标题
+    current_y = 0
+    for i, img in enumerate(pil_images):
+        if titles and i < len(titles):
+            # 如果有标题，添加标题文本
+            from PIL import ImageDraw, ImageFont
+            draw = ImageDraw.Draw(combined_image)
+            try:
+                font = ImageFont.truetype("arial.ttf", 20)
+            except:
+                font = ImageFont.load_default()
+            draw.text((10, current_y), titles[i], fill='black', font=font)
+            current_y += title_height
+
+        # 调整图片大小以匹配最大宽度
+        if img.width != max_width:
+            ratio = max_width / img.width
+            new_height = int(img.height * ratio)
+            img = img.resize((max_width, new_height), Image.Resampling.LANCZOS)
+
+        combined_image.paste(img, (0, current_y))
+        current_y += img.height
+
+    # 转换为base64
+    buffer = io.BytesIO()
+    combined_image.save(buffer, format='PNG')
+    combined_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    
+    return combined_b64
+
+def screenshot_it(target: any, results: dict):
+    """截图主函数，包含重试逻辑，并将结果存储在results字典中"""
     target_name = target["name"]
     max_retries = 2
     
@@ -398,6 +464,12 @@ def screenshot_it(target: any):
                 # 保存全页面截图
                 full_screenshot_path = os.path.join(backup_dir, f'{target_name}_full.png')
                 driver.save_screenshot(full_screenshot_path)
+                
+                # 存储结果
+                results[target_name] = {
+                    'full_path': full_screenshot_path,
+                    'load_time': load_time
+                }
                 
                 # 如果有iframe截图，保存并进行比较
                 if iframe_b64_wx:
@@ -414,43 +486,15 @@ def screenshot_it(target: any):
                             similarity = compare_images_sift(latest_image, iframe_screenshot_path)
                             print(f"图片比较完成，相似度: {similarity:.2f}")
                             
-                            # 构建消息内容
-                            message = f"页面 {target_name} 加载耗时: {load_time:.2f}秒\n✅ 页面内容基本一致，相似度: {similarity:.2f}"
+                            # 存储比对结果
+                            results[target_name]['similarity'] = similarity
                             
-                            # 发送到1183群
-                            send_load_time_message(target_name, load_time, message)
-                            
-                            # 如果相似度小于0.7，额外发送告警到1098群
-                            if similarity < 0.7:
-                                alert_message = f"⚠️ 警告：{target_name} 页面内容发生重大变化！\n相似度: {similarity:.2f}\n加载耗时: {load_time:.2f}秒"
-                                for attempt in range(3):  # 最多重试3次
-                                    try:
-                                        resp = requests.post(
-                                            'https://cnioc.telecomjs.com:18080/serv/atom-center/atom/v1.0/atom_center/dsjj_message',
-                                            json={
-                                                "content": alert_message,
-                                                "robot_id": "1098"
-                                            },
-                                            headers={
-                                                "staffCode": "GUOMO",
-                                                "app-key": "B8D16767C25A3C377C2A8F7DBFF68D36"
-                                            },
-                                            verify=False
-                                        )
-                                        print(f"告警消息发送响应: {resp.text}")
-                                        break
-                                    except requests.exceptions.RequestException as e:
-                                        print(f"第 {attempt + 1} 次发送告警消息失败: {str(e)}")
-                                        if attempt < 2:  # 如果不是最后一次尝试
-                                            time.sleep(2)  # 等待2秒后重试
                         except Exception as e:
                             print(f"图片比较失败: {str(e)}")
                             print(f"Error type: {type(e).__name__}")
                             print(f"Error details: {e.args}")
-                            send_load_time_message(target_name, load_time)
                     else:
                         print(f"未找到历史图片用于比较: {target_name}")
-                        send_load_time_message(target_name, load_time)
                 
                 return
                 
@@ -465,25 +509,24 @@ def screenshot_it(target: any):
         else:
             print(f"截图失败，已达到最大重试次数: {target_name}")
 
-def send_load_time_message(target_name: str, load_time: float, additional_message: str = None):
-    """发送加载时间和比较结果到钉钉"""
-    max_retries = 3  # 添加重试机制
-    retry_delay = 2  # 重试间隔秒数
+def send_message_to_dingding(message: str, robot_id: str):
+    """发送消息到钉钉群"""
+    max_retries = 3
+    retry_delay = 2
     
     for attempt in range(max_retries):
         try:
-            message = additional_message if additional_message else f"页面 {target_name} 加载耗时: {load_time:.2f}秒"
             resp = requests.post(
                 'https://cnioc.telecomjs.com:18080/serv/atom-center/atom/v1.0/atom_center/dsjj_message',
                 json={
                     "content": message,
-                    "robot_id": "1183"
+                    "robot_id": robot_id
                 },
                 headers={
                     "staffCode": "GUOMO",
                     "app-key": "B8D16767C25A3C377C2A8F7DBFF68D36"
                 },
-                verify=False  # 忽略SSL证书验证
+                verify=False
             )
             print(f"消息发送响应: {resp.text}")
             return  # 发送成功，退出重试
@@ -496,11 +539,59 @@ def send_load_time_message(target_name: str, load_time: float, additional_messag
             else:
                 print(f"发送消息最终失败，已达到最大重试次数")
 
+# 主执行流程修改
+results = {}  # 存储所有结果
 for target in config_data["targets"]:
-    screenshot_it(target)
+    screenshot_it(target, results)
 
-
-
+# 在所有截图完成后处理结果
+if results:
+    # 合并所有全页面截图
+    full_images = []
+    titles = []
+    for target_name, result in results.items():
+        if os.path.exists(result['full_path']):
+            full_images.append(Image.open(result['full_path']))
+            titles.append(target_name)
+    
+    # 合并图片
+    if full_images:
+        combined_b64 = combine_images(full_images, titles)
+        combined_b64_ding = "data:image/png;base64," + combined_b64
+        
+        # 构建汇总消息
+        summary_message = "监控结果汇总：\n"
+        for target_name, result in results.items():
+            summary_message += f"\n{target_name}:\n"
+            summary_message += f"- 加载耗时: {result['load_time']:.2f}秒\n"
+            if 'similarity' in result:
+                similarity = result['similarity']
+                summary_message += f"- 相似度: {similarity:.2f}"
+                if similarity < 0.7:
+                    summary_message += " ⚠️ 检测到重大变化！"
+                summary_message += "\n"
+        
+        # 发送合并后的图片和汇总消息到1183群
+        DinghatSendImg(combined_b64_ding, "1183")
+        send_message_to_dingding(summary_message, "1183")
+        
+        # 检查是否有需要告警的情况
+        alert_needed = any(
+            'similarity' in result and result['similarity'] < 0.7 
+            for result in results.values()
+        )
+        
+        if alert_needed:
+            # 发送告警消息和图片到1098群
+            DinghatSendImg(combined_b64_ding, "1098")
+            alert_message = "⚠️ 警告：检测到以下页面发生重大变化：\n"
+            for target_name, result in results.items():
+                if 'similarity' in result and result['similarity'] < 0.7:
+                    alert_message += f"\n{target_name}:\n"
+                    alert_message += f"- ✅相似度: {result['similarity']:.2f}\n"
+                    alert_message += f"- 加载耗时: {result['load_time']:.2f}秒\n"
+            
+            send_message_to_dingding(alert_message, "1098")
 
 driver.quit()
 
