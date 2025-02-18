@@ -414,13 +414,35 @@ def screenshot_it(target: any):
                             similarity = compare_images_sift(latest_image, iframe_screenshot_path)
                             print(f"图片比较完成，相似度: {similarity:.2f}")
                             
-                            message = f"页面 {target_name} 加载耗时: {load_time:.2f}秒\n"
-                            if similarity < 0.7:
-                                message += f"⚠️ 检测到页面内容发生变化！相似度: {similarity:.2f}"
-                            else:
-                                message += f"✅ 页面内容基本一致，相似度: {similarity:.2f}"
+                            # 构建消息内容
+                            message = f"页面 {target_name} 加载耗时: {load_time:.2f}秒\n✅ 页面内容基本一致，相似度: {similarity:.2f}"
                             
+                            # 发送到1183群
                             send_load_time_message(target_name, load_time, message)
+                            
+                            # 如果相似度小于0.7，额外发送告警到1098群
+                            if similarity < 0.7:
+                                alert_message = f"⚠️ 警告：{target_name} 页面内容发生重大变化！\n相似度: {similarity:.2f}\n加载耗时: {load_time:.2f}秒"
+                                for attempt in range(3):  # 最多重试3次
+                                    try:
+                                        resp = requests.post(
+                                            'https://cnioc.telecomjs.com:18080/serv/atom-center/atom/v1.0/atom_center/dsjj_message',
+                                            json={
+                                                "content": alert_message,
+                                                "robot_id": "1098"
+                                            },
+                                            headers={
+                                                "staffCode": "GUOMO",
+                                                "app-key": "B8D16767C25A3C377C2A8F7DBFF68D36"
+                                            },
+                                            verify=False
+                                        )
+                                        print(f"告警消息发送响应: {resp.text}")
+                                        break
+                                    except requests.exceptions.RequestException as e:
+                                        print(f"第 {attempt + 1} 次发送告警消息失败: {str(e)}")
+                                        if attempt < 2:  # 如果不是最后一次尝试
+                                            time.sleep(2)  # 等待2秒后重试
                         except Exception as e:
                             print(f"图片比较失败: {str(e)}")
                             print(f"Error type: {type(e).__name__}")
