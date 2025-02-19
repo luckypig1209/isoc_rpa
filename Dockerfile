@@ -55,9 +55,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制应用文件
 COPY main.py config.test.yaml ./
-
+COPY .history ./.history
 # 创建历史记录目录
-RUN mkdir -p .history && chmod 777 .history
+#RUN mkdir -p .history && chmod 777 .history
 
 # 设置非root用户
 RUN useradd -m -s /bin/bash appuser \
