@@ -1,10 +1,10 @@
-# 使用 Python 3.9 镜像
-FROM python:3.9
+# 使用官方Python镜像
+FROM python:3.9-slim
 
-ENV http_proxy=http://10.123.26.113:7890
-ENV https_proxy=http://10.123.26.113:7890
-ENV all_proxy=socks5://10.123.26.113:7890
-
+# 添加构建参数用于代理设置
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG ALL_PROXY
 
 # 设置工作目录
 WORKDIR /app
@@ -13,56 +13,56 @@ WORKDIR /app
 ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# 使用国内镜像源
-RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+# 设置apt代理
+RUN echo "Acquire::http::Proxy \"${HTTP_PROXY}\";" > /etc/apt/apt.conf.d/proxy.conf && \
+    echo "Acquire::https::Proxy \"${HTTPS_PROXY}\";" >> /etc/apt/apt.conf.d/proxy.conf
 
-# 安装必要的系统依赖
-RUN apt-get update -y && apt-get install -y \
-    wget \
-    gnupg2 \
+# 安装必要依赖
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    chromium \
+    chromium-driver \
     fonts-liberation \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libatspi2.0-0 \
-    libcups2 \
-    libdbus-1-3 \
-    libdrm2 \
-    libgbm1 \
-    libgtk-3-0 \
-    libnspr4 \
     libnss3 \
-    libwayland-client0 \
+    libglib2.0-0 \
+    libasound2 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
     libxcomposite1 \
     libxdamage1 \
     libxfixes3 \
-    libxkbcommon0 \
     libxrandr2 \
-    xdg-utils \
-    chromium \
-    chromium-driver \
-    procps \
+    libgbm1 \
+    libgtk-3-0 \
+    libxss1 \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -f /etc/apt/apt.conf.d/proxy.conf
 
-# 复制项目文件
+# 设置环境变量
+ENV CHROME_BIN=/usr/bin/chromium \
+    CHROMIUM_PATH=/usr/bin/chromium \
+    CHROMEDRIVER_PATH=/usr/bin/chromedriver \
+    PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+# 复制并安装依赖
 COPY requirements.txt .
-COPY main.py .
-COPY config.test.yaml .
-
-# 安装 Python 依赖
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 创建历史记录目录并设置权限
+# 复制应用文件
+COPY main.py config.test.yaml ./
+
+# 创建历史记录目录
 RUN mkdir -p .history && chmod 777 .history
 
 # 设置非root用户
-RUN useradd -m -s /bin/bash appuser && chown -R appuser:appuser /app
+RUN useradd -m -s /bin/bash appuser \
+    && chown -R appuser:appuser /app
 USER appuser
 
-# 设置健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD ps aux | grep python | grep main.py || exit 1
-
 # 运行脚本
-CMD ["python", "main.py"]
+CMD ["/bin/bash"]

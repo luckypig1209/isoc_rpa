@@ -78,14 +78,19 @@ except yaml.YAMLError as e:
 
 
 options = OptionsChrome()
-options.add_argument('--headless=new')  # 启用新版headless模式
+options.add_argument('--headless=new')
 options.add_argument('--no-sandbox')
 options.add_argument('--disable-dev-shm-usage')
 options.add_argument('--disable-gpu')
-options.add_argument('--window-size=1920,1080')  # 设置固定窗口大小
+options.add_argument('--window-size=1920,1080')
 options.add_argument('--ignore-certificate-errors')
+options.binary_location = '/usr/bin/chromium'  # 指定 Chromium 位置
 
-driver = webdriver.Chrome(options=options)  # 在Docker中不需要指定executable_path
+# 使用 ChromeDriver 的路径
+driver = webdriver.Chrome(
+    options=options,
+    service=Service('/usr/bin/chromedriver')  # 指定 chromedriver 路径
+)
 
 def cleanup_old_backups(history_dir: str, days: int = 5):
     """清理指定天数之前的备份文件"""
