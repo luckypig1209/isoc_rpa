@@ -1,5 +1,6 @@
 # 使用官方Python镜像
 FROM python:3.9-slim
+# FROM --platform=linux/amd64 python:3.9-slim
 
 # 添加构建参数用于代理设置
 ARG HTTP_PROXY
@@ -9,7 +10,7 @@ ARG ALL_PROXY
 # 设置工作目录
 WORKDIR /app
 
-# 设置时区为中国时区
+# 设置时区为中国时区；
 ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
@@ -17,10 +18,21 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 RUN echo "Acquire::http::Proxy \"${HTTP_PROXY}\";" > /etc/apt/apt.conf.d/proxy.conf && \
     echo "Acquire::https::Proxy \"${HTTPS_PROXY}\";" >> /etc/apt/apt.conf.d/proxy.conf
 
+# 使用阿里云镜像源
+RUN echo "deb http://mirrors.aliyun.com/debian/ bullseye main non-free contrib" > /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian-security/ bullseye-security main" >> /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian/ bullseye-updates main non-free contrib" >> /etc/apt/sources.list
+
 # 安装必要依赖和中文字体
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    chromium \
+    wget \
+    gnupg \
+    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list \
+    && apt-get update && \
+    apt-get install -y --no-install-recommends \
+    google-chrome-stable \
     chromium-driver \
     fonts-liberation \
     libnss3 \
@@ -52,8 +64,8 @@ RUN sed -i '/zh_CN.UTF-8/s/^# //g' /etc/locale.gen && \
     update-locale LANG=zh_CN.UTF-8 LANGUAGE=zh_CN:zh LC_ALL=zh_CN.UTF-8
 
 # 设置环境变量
-ENV CHROME_BIN=/usr/bin/chromium \
-    CHROMIUM_PATH=/usr/bin/chromium \
+ENV CHROME_BIN=/usr/bin/google-chrome \
+    CHROMIUM_PATH=/usr/bin/google-chrome \
     CHROMEDRIVER_PATH=/usr/bin/chromedriver \
     PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
