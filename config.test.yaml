@@ -1,12 +1,14 @@
 targets:
   - name: ybiframe
     url: http://132.254.207.138:38080/yitu/index.html#/chart/publishShort/1hx7yh60big000
-    open-wait-secs: 60
+    open-wait-secs: 90
+    after-load-wait-secs: 10
     elements-check:
       - type: iframe
         locator:
           type: css-selector
           value: "#h74i8m87jvc00 iframe"
+        wait-for-content: true
         capture:
           x: 570
           y: 200
@@ -14,12 +16,14 @@ targets:
           height: 680
   - name: dsjiframe
     url: http://132.254.207.138:38080/yitu/index.html#/chart/publishShort/48ydcb79222000
-    open-wait-secs: 60
+    open-wait-secs: 90
+    after-load-wait-secs: 10
     elements-check:
       - type: iframe
         locator:
           type: css-selector
           value: "#h74i8m87jvc00 iframe"
+        wait-for-content: true
         capture:
           x: 570
           y: 150
@@ -28,11 +32,13 @@ targets:
   - name: tciframe
     url: http://132.254.207.138:38080/yitu/index.html#/chart/publishShort/2bmkieuyofok00
     open-wait-secs: 60
+    after-load-wait-secs: 10  # 添加额外等待时间
     elements-check:
       - type: iframe
         locator:
           type: css-selector
           value: "#h74i8m87jvc00 iframe"
+        wait-for-content: true  # 等待iframe内容加载
         capture:
           x: 570
           y: 200
@@ -41,11 +47,13 @@ targets:
   - name: gatiframe
     url: http://132.254.207.138:38080/yitu/index.html#/chart/publishShort/3x16et99f60000
     open-wait-secs: 60
+    after-load-wait-secs: 10  # 添加额外等待时间
     elements-check:
-      - type: iframe # iframe, element, video
+      - type: iframe
         locator:
-          type: css-selector # id, xpath
-          value: "#h74i8m87jvc00 iframe" #app video.cool-video
+          type: css-selector
+          value: "#h74i8m87jvc00 iframe"
+        wait-for-content: true  # 等待iframe内容加载
         capture:
           x: 570
           y: 230
@@ -54,16 +62,18 @@ targets:
   - name: wltiframe
     url: http://132.252.100.92:8088/#/share/a87039032dcc41abb1d045950be1d7ef
     open-wait-secs: 60
-    after-load-wait-secs: 5  # 加载后额外等待5秒
+    after-load-wait-secs: 10  # 加载后额外等待5秒
     elements-check: []  # 空列表，表示不需要等待任何元素
   - name: gyiframe
     url: http://132.254.207.138:38080/yitu/index.html#/chart/publishShort/ba95d0yijwo00
     open-wait-secs: 60
+    after-load-wait-secs: 10
     elements-check:
-      - type: iframe # iframe, element, video
+      - type: iframe
         locator:
-          type: css-selector # id, xpath
-          value: "#\\31whtzve5qo3k00 iframe" #app video.cool-video
+          type: css-selector
+          value: "#\\31whtzve5qo3k00 iframe"
+        wait-for-content: true
         capture:
           x: 620
           y: 220

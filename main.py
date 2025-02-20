@@ -54,14 +54,65 @@ class IframeLoaded:
         self.locator = locator
 
     def __call__(self, driver):
-        element = driver.find_element(*self.locator)
-        driver.switch_to.frame(element)
-        body_element = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-        result = driver.execute_script("return arguments[0].getAttribute('style');", body_element)
-        body_style = body_element.get_attribute("style")
-        print(result, body_style)
-        driver.switch_to.default_content()
-        return result is not None
+        try:
+            print("等待 iframe 出现...")
+            # 先等待一段时间让页面加载
+            time.sleep(3)  # 增加初始等待时间
+            
+            # 尝试查找 iframe
+            print(f"尝试查找: {self.locator[1]}")
+            element = driver.find_element(*self.locator)
+            if not element:
+                print("未找到 iframe")
+                return False
+                
+            print("找到 iframe，等待内容加载...")
+            
+            # 切换到 iframe
+            driver.switch_to.frame(element)
+            
+            try:
+                # 等待 iframe 内容加载
+                body_element = WebDriverWait(driver, 20).until(
+                    EC.presence_of_element_located((By.TAG_NAME, "body"))
+                )
+                
+                # 等待页面完全加载
+                WebDriverWait(driver, 20).until(
+                    lambda d: d.execute_script("return document.readyState") == "complete"
+                )
+                
+                # 检查 iframe 是否有实际内容
+                content_elements = driver.find_elements(By.CSS_SELECTOR, "div, canvas, svg, .chart-wrap")
+                has_content = len(content_elements) > 0
+                
+                if has_content:
+                    print(f"找到 {len(content_elements)} 个内容元素")
+                    # 额外等待确保图表渲染完成
+                    time.sleep(2)
+                else:
+                    print("未找到内容元素")
+                
+                # 切回主文档
+                driver.switch_to.default_content()
+                return has_content
+                
+            finally:
+                # 确保切回主文档
+                driver.switch_to.default_content()
+                
+        except Exception as e:
+            print(f"Iframe load check failed: {str(e)}")
+            # 打印更多调试信息
+            print("当前页面 URL:", driver.current_url)
+            try:
+                all_iframes = driver.find_elements(By.TAG_NAME, "iframe")
+                print("页面中的所有 iframe 数量:", len(all_iframes))
+                for idx, iframe in enumerate(all_iframes):
+                    print(f"iframe {idx} id:", iframe.get_attribute("id"))
+            except:
+                pass
+            return False
 
 # load config
 try:
@@ -552,8 +603,8 @@ if results:
                 summary_message += "\n"
         
         # 发送合并后的图片和汇总消息到1183群
-        # DinghatSendImg(combined_b64_ding, "1183")
-        # send_message_to_dingding(summary_message, "1183")
+        DinghatSendImg(combined_b64_ding, "1183")
+        send_message_to_dingding(summary_message, "1183")
         
         # 检查是否有需要告警的情况
         alert_needed = any(
@@ -563,7 +614,7 @@ if results:
         
         if alert_needed:
             # 发送告警消息和图片到1098群
-            # DinghatSendImg(combined_b64_ding, "1098")
+            DinghatSendImg(combined_b64_ding, "1098")
             alert_message = "⚠️ 警告：检测到以下页面发生重大变化：\n"
             for target_name, result in results.items():
                 if 'similarity' in result and result['similarity'] < 0.7:
@@ -571,7 +622,7 @@ if results:
                     alert_message += f"- ✅相似度: {result['similarity']:.2f}\n"
                     alert_message += f"- 加载耗时: {result['load_time']:.2f}秒\n"
             
-            # send_message_to_dingding(alert_message, "1098")
+            send_message_to_dingding(alert_message, "1098")
 
 driver.quit()
 

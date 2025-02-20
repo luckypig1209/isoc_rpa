@@ -17,7 +17,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 RUN echo "Acquire::http::Proxy \"${HTTP_PROXY}\";" > /etc/apt/apt.conf.d/proxy.conf && \
     echo "Acquire::https::Proxy \"${HTTPS_PROXY}\";" >> /etc/apt/apt.conf.d/proxy.conf
 
-# 安装必要依赖
+# 安装必要依赖和中文字体
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     chromium \
@@ -38,16 +38,28 @@ RUN apt-get update && \
     libgbm1 \
     libgtk-3-0 \
     libxss1 \
+    # 添加中文字体包
+    fonts-noto-cjk \
+    fonts-noto-cjk-extra \
+    locales \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /etc/apt/apt.conf.d/proxy.conf
+
+# 生成中文语言环境
+RUN sed -i '/zh_CN.UTF-8/s/^# //g' /etc/locale.gen && \
+    locale-gen && \
+    update-locale LANG=zh_CN.UTF-8 LANGUAGE=zh_CN:zh LC_ALL=zh_CN.UTF-8
 
 # 设置环境变量
 ENV CHROME_BIN=/usr/bin/chromium \
     CHROMIUM_PATH=/usr/bin/chromium \
     CHROMEDRIVER_PATH=/usr/bin/chromedriver \
     PYTHONUNBUFFERED=1 \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    LANG=zh_CN.UTF-8 \
+    LANGUAGE=zh_CN:zh \
+    LC_ALL=zh_CN.UTF-8
 
 # 复制并安装依赖
 COPY requirements.txt .
