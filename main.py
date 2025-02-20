@@ -146,47 +146,65 @@ def take_screenshot(driver, target: any) -> tuple[bool, str, str, str, str, floa
         target_name = target['name']
         url = target['url']
         open_wait_secs = target.get('open-wait-secs', 10)
+        after_load_wait_secs = target.get('after-load-wait-secs', 0)  # 新增配置项
         elements_check = target.get('elements-check', [])
+        
+        print(f"\n开始处理目标: {target_name}")
+        print(f"访问URL: {url}")
         
         start_time = time.time()
         driver.get(url)
+        print(f"页面加载完成，耗时: {time.time() - start_time:.2f}秒")
         
         # 等待页面加载
-        for element_check in elements_check:
-            element_type = element_check['type']
-            locator = element_check['locator']
-            locator_type = locator['type']
-            locator_val = locator['value']
+        if elements_check:  # 只有在有elements_check时才执行等待
+            for element_check in elements_check:
+                element_type = element_check['type']
+                locator = element_check['locator']
+                locator_type = locator['type']
+                locator_val = locator['value']
+                
+                # 转换定位器类型
+                by_type = getattr(By, locator_type.replace('-', '_').upper())
+                
+                # 等待元素出现
+                ready_wait = WebDriverWait(driver, open_wait_secs)
+                
+                if element_type == 'video':
+                    cond = VideoLoaded((by_type, locator_val))
+                elif element_type == 'iframe':
+                    cond = IframeLoaded((by_type, locator_val))
+                else:
+                    cond = ElementLoaded((by_type, locator_val))
+                
+                ready_wait.until(cond)
+        else:
+            print("无需等待特定元素，直接截图")
+            time.sleep(open_wait_secs)  # 使用配置的等待时间
             
-            # 转换定位器类型
-            by_type = getattr(By, locator_type.replace('-', '_').upper())
-            
-            # 等待元素出现
-            ready_wait = WebDriverWait(driver, open_wait_secs)
-            
-            if element_type == 'video':
-                cond = VideoLoaded((by_type, locator_val))
-            elif element_type == 'iframe':
-                cond = IframeLoaded((by_type, locator_val))
-            else:
-                cond = ElementLoaded((by_type, locator_val))
-            
-            ready_wait.until(cond)
+            if after_load_wait_secs > 0:  # 如果配置了额外等待时间
+                print(f"额外等待 {after_load_wait_secs} 秒...")
+                time.sleep(after_load_wait_secs)
         
         # 等待渲染完成
+        print("等待渲染完成...")
         time.sleep(2)
         
         # 重置滚动位置
         driver.execute_script('window.scrollTo(0, 0);')
-        
-        # 截图前再次等待
-        time.sleep(1)
+        print("页面滚动重置完成")
         
         # 获取全页面截图
+        print("开始截取全页面...")
         full_img = driver.get_screenshot_as_png()
         full_b64_wx = base64.b64encode(full_img).decode('utf-8')
         full_b64_ding = "data:image/png;base64," + full_b64_wx
+        print("全页面截图完成")
         
+        # 如果没有 elements_check，直接返回全页面截图
+        if not elements_check:
+            return True, full_b64_wx, full_b64_ding, full_b64_wx, full_b64_ding, time.time() - start_time
+            
         # 初始化iframe截图的base64字符串
         iframe_b64_wx = ""
         iframe_b64_ding = ""

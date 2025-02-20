@@ -54,11 +54,8 @@ targets:
   - name: wltiframe
     url: http://132.252.100.92:8088/#/share/a87039032dcc41abb1d045950be1d7ef
     open-wait-secs: 60
-    elements-check:
-#      - type: iframe # iframe, element, video
-#        locator:
-#          type: css-selector # id, xpath
-#          value: "#h74i8m87jvc00 iframe" #app video.cool-video
+    after-load-wait-secs: 5  # 加载后额外等待5秒
+    elements-check: []  # 空列表，表示不需要等待任何元素
   - name: gyiframe
     url: http://132.254.207.138:38080/yitu/index.html#/chart/publishShort/ba95d0yijwo00
     open-wait-secs: 60
