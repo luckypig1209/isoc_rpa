@@ -502,8 +502,8 @@ def screenshot_it(target: any, results: dict):
                     'load_time': load_time
                 }
                 
-                # 如果有iframe截图，保存并进行比较
-                if iframe_b64_wx:
+                # 如果有iframe截图且不是wltiframe，保存并进行比较
+                if iframe_b64_wx and target_name != 'wltiframe':
                     print(f"保存 iframe 截图: {target_name}")
                     iframe_screenshot_path = os.path.join(backup_dir, f'{target_name}_iframe.png')
                     with open(iframe_screenshot_path, 'wb') as f:
@@ -591,11 +591,12 @@ if results:
         combined_b64_ding = "data:image/png;base64," + combined_b64
         
         # 构建汇总消息
-        summary_message = "监控结果汇总：\n"
+        summary_message = "巡检结果汇总：\n"
         for target_name, result in results.items():
             summary_message += f"\n{target_name}:\n"
             summary_message += f"- 加载耗时: {result['load_time']:.2f}秒\n"
-            if 'similarity' in result:
+            # 只为非wltiframe目标添加相似度信息
+            if target_name != 'wltiframe' and 'similarity' in result:
                 similarity = result['similarity']
                 summary_message += f"- 相似度: {similarity:.2f}"
                 if similarity < 0.7:
@@ -606,10 +607,12 @@ if results:
         DinghatSendImg(combined_b64_ding, "1183")
         send_message_to_dingding(summary_message, "1183")
         
-        # 检查是否有需要告警的情况
+        # 检查是否有需要告警的情况（排除wltiframe）
         alert_needed = any(
-            'similarity' in result and result['similarity'] < 0.7 
-            for result in results.values()
+            target_name != 'wltiframe' and 
+            'similarity' in result and 
+            result['similarity'] < 0.7 
+            for target_name, result in results.items()
         )
         
         if alert_needed:
@@ -617,7 +620,7 @@ if results:
             DinghatSendImg(combined_b64_ding, "1098")
             alert_message = "⚠️ 警告：检测到以下页面发生重大变化：\n"
             for target_name, result in results.items():
-                if 'similarity' in result and result['similarity'] < 0.7:
+                if target_name != 'wltiframe' and 'similarity' in result and result['similarity'] < 0.7:
                     alert_message += f"\n{target_name}:\n"
                     alert_message += f"- ✅相似度: {result['similarity']:.2f}\n"
                     alert_message += f"- 加载耗时: {result['load_time']:.2f}秒\n"
