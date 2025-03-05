@@ -1,14 +1,47 @@
-version: '3.8'
+version: '3'
 services:
+  isoc-arm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - HTTP_PROXY=${HTTP_PROXY}
+        - HTTPS_PROXY=${HTTPS_PROXY}
+        - ALL_PROXY=${ALL_PROXY}
+    platform: linux/arm64
+    container_name: isoc-arm
+    volumes:
+      - .:/app
+    tty: true
+
+  isoc-amd64:
+    build:
+      context: .
+      dockerfile: Dockerfile.amd64
+      args:
+        - HTTP_PROXY=${HTTP_PROXY}
+        - HTTPS_PROXY=${HTTPS_PROXY}
+        - ALL_PROXY=${ALL_PROXY}
+    platform: linux/amd64
+    container_name: isoc-amd64
+    volumes:
+      - .:/app
+    tty: true
+
   app:
     build:
       context: .
-      args:
-        - HTTP_PROXY=http://host.docker.internal:7890
-        - HTTPS_PROXY=http://host.docker.internal:7890
-        - ALL_PROXY=socks5://host.docker.internal:7890
+      dockerfile: Dockerfile.windows
     volumes:
       - ./.history:/app/.history
     restart: unless-stopped
     extra_hosts:
-      - "host.docker.internal:host-gateway" 
+      - "host.docker.internal:host-gateway"
+
+  app-linux:
+    build:
+      context: .
+      dockerfile: Dockerfile.linux
+    volumes:
+      - ./.history:/app/.history
+    restart: unless-stopped 

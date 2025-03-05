@@ -1,6 +1,6 @@
 # 使用官方Python镜像
-FROM python:3.9-slim
-# FROM --platform=linux/amd64 python:3.9-slim
+# FROM python:3.9-slim
+FROM --platform=linux/amd64 python:3.9-slim
 
 # 添加构建参数用于代理设置
 ARG HTTP_PROXY

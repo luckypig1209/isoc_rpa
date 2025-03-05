@@ -27,6 +27,17 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 cfg_file_path = "config.test.yaml"
 
+# 添加名称映射字典
+NAME_MAPPINGS = {
+    'ybiframe': '医保局网络监控',
+    'dsjiframe': '电子政务外网监控',
+    'tciframe': '江苏体彩智能网络监控',
+    'gatiframe': '公安二级主干网络监控',
+    'wltiframe': '省文旅厅监控项目派单统计',
+    'gyiframe': '省高级人民法院',
+    'abaaba': '省医保信息系统感知平台'
+}
+
 class VideoLoaded:
     def __init__(self, locator):
         self.locator = locator
@@ -591,9 +602,10 @@ if results:
         combined_b64_ding = "data:image/png;base64," + combined_b64
         
         # 构建汇总消息
-        summary_message = "巡检结果汇总：\n"
+        summary_message = "监控结果汇总：\n"
         for target_name, result in results.items():
-            summary_message += f"\n{target_name}:\n"
+            display_name = NAME_MAPPINGS.get(target_name, target_name)  # 获取映射名称
+            summary_message += f"\n{display_name}:\n"
             summary_message += f"- 加载耗时: {result['load_time']:.2f}秒\n"
             # 只为非wltiframe目标添加相似度信息
             if target_name != 'wltiframe' and 'similarity' in result:
@@ -621,7 +633,8 @@ if results:
             alert_message = "⚠️ 警告：检测到以下页面发生重大变化：\n"
             for target_name, result in results.items():
                 if target_name != 'wltiframe' and 'similarity' in result and result['similarity'] < 0.7:
-                    alert_message += f"\n{target_name}:\n"
+                    display_name = NAME_MAPPINGS.get(target_name, target_name)  # 获取映射名称
+                    alert_message += f"\n{display_name}:\n"
                     alert_message += f"- ✅相似度: {result['similarity']:.2f}\n"
                     alert_message += f"- 加载耗时: {result['load_time']:.2f}秒\n"
             
