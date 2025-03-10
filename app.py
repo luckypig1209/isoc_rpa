@@ -17,7 +17,7 @@ def init_driver():
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
     chrome_options.add_argument('--disable-gpu')
-    chrome_options.add_argument('--window-size=1920,1080')
+    chrome_options.add_argument('--window-size=1920,1200')  # 使用16:10比例
     chrome_options.add_argument('--hide-scrollbars')
     chrome_options.add_argument('--ignore-certificate-errors')
     chrome_options.binary_location = '/usr/bin/chromium'
@@ -87,16 +87,41 @@ def take_screenshot(driver, url, wait_time=60):
         print("\n最终处理...")
         time.sleep(10)
         
-        # 获取页面高度
-        page_height = driver.execute_script("""
-            return Math.max(
-                document.documentElement.scrollHeight,
-                document.body.scrollHeight
-            );
-        """)
-        
         # 设置窗口大小
-        driver.set_window_size(1920, page_height)
+        driver.set_window_size(1920, 1200)  # 使用16:10比例
+        
+        # 执行页面调整
+        driver.execute_script("""
+            // 调整所有iframe的大小
+            var iframes = document.getElementsByTagName('iframe');
+            for(var i = 0; i < iframes.length; i++) {
+                iframes[i].style.width = '1920px';  // 设置固定宽度
+                iframes[i].style.height = '1000px';  // 调整高度
+                iframes[i].style.margin = '0';
+                iframes[i].style.padding = '0';
+                iframes[i].style.transform = 'scale(1)';  // 确保不会被缩放
+                iframes[i].style.transformOrigin = 'top left';
+            }
+            
+            // 调整页面缩放和边距
+            document.body.style.margin = '0';
+            document.body.style.padding = '0';
+            document.documentElement.style.margin = '0';
+            document.documentElement.style.padding = '0';
+            document.body.style.width = '1920px';  // 设置固定宽度
+            document.body.style.overflow = 'hidden';  // 防止出现滚动条
+            
+            // 移除可能的边框和边距
+            var elements = document.getElementsByTagName('*');
+            for(var i = 0; i < elements.length; i++) {
+                elements[i].style.margin = '0';
+                elements[i].style.padding = '0';
+                elements[i].style.boxSizing = 'border-box';  // 确保padding不会增加实际尺寸
+            }
+            
+            // 确保滚动到顶部
+            window.scrollTo(0, 0);
+        """)
         
         # 等待内容渲染
         time.sleep(5)
@@ -126,6 +151,10 @@ def take_screenshot(driver, url, wait_time=60):
 def screenshot():
     """截图服务接口"""
     try:
+        data = request.get_json()
+        width = data.get('width', 1920)   # 使用1920宽度
+        height = data.get('height', 1200)  # 使用1200高度
+        
         # 读取配置文件
         with open('config.test.yaml', 'r', encoding='utf-8') as f:
             config = yaml.safe_load(f)
@@ -140,6 +169,8 @@ def screenshot():
             
         driver = init_driver()
         try:
+            # 设置窗口大小
+            driver.set_window_size(width, height)
             result = take_screenshot(driver, target['url'])
             return jsonify(result)
         finally:
