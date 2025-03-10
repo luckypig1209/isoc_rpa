@@ -87,3 +87,8 @@ targets:
         locator:
           type: css-selector # id, xpath
           value: "#app video.cool-video" #app video.cool-video
+  - name: test123
+    url: http://132.254.207.139:38080/yitu/index.html#/chart/publishShort/3q1yc0x1e1w000
+    open-wait-secs: 60  # 设置等待时间为60秒，与其他类似配置保持一致
+    after-load-wait-secs: 10  # 额外等待10秒
+    elements-check: []  # 空列表，表示不需要等待任何元素

@@ -6,8 +6,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import base64
 import time
-import io
-from PIL import Image
+import yaml
 
 app = Flask(__name__)
 
@@ -21,25 +20,94 @@ def init_driver():
     chrome_options.add_argument('--window-size=1920,1080')
     chrome_options.add_argument('--hide-scrollbars')
     chrome_options.add_argument('--ignore-certificate-errors')
+    chrome_options.binary_location = '/usr/bin/chromium'
     
     return webdriver.Chrome(options=chrome_options)
 
-def take_screenshot(driver, url, wait_time=10):
+def take_screenshot(driver, url, wait_time=60):
     """获取网页截图"""
     try:
-        driver.get(url)
-        time.sleep(wait_time)  # 等待页面加载
+        print(f"访问URL: {url}")
         
-        # 获取页面实际高度
-        page_height = driver.execute_script('return document.documentElement.scrollHeight')
-        # 设置窗口大小以适应整个页面
+        # 设置超时时间
+        driver.set_page_load_timeout(wait_time)
+        driver.set_script_timeout(wait_time)
+        
+        # 访问页面
+        driver.get(url)
+        print("页面加载完成")
+        
+        # 等待页面加载
+        WebDriverWait(driver, wait_time).until(
+            lambda d: d.execute_script("return document.readyState") == "complete"
+        )
+        print("主文档加载完成")
+        
+        # 等待页面充分加载
+        time.sleep(15)
+        
+        # 处理所有iframe
+        iframes = driver.find_elements(By.TAG_NAME, "iframe")
+        print(f"找到 {len(iframes)} 个iframe")
+        
+        for idx, iframe in enumerate(iframes):
+            try:
+                print(f"\n处理 iframe {idx}")
+                iframe_src = iframe.get_attribute('src')
+                print(f"iframe {idx} src: {iframe_src}")
+                
+                # 等待iframe加载完成
+                WebDriverWait(driver, 30).until(
+                    EC.frame_to_be_available_and_switch_to_it(iframe)
+                )
+                
+                # 等待iframe内容加载
+                WebDriverWait(driver, wait_time).until(
+                    lambda d: d.execute_script("return document.readyState") == "complete"
+                )
+                
+                # 切回主文档
+                driver.switch_to.default_content()
+                
+                # 设置iframe样式
+                driver.execute_script("""
+                    var iframe = arguments[0];
+                    iframe.style.width = '100%';
+                    iframe.style.height = '800px';
+                    iframe.style.display = 'block';
+                    iframe.style.visibility = 'visible';
+                """, iframe)
+                
+            except Exception as e:
+                print(f"处理 iframe {idx} 时出错: {str(e)}")
+                driver.switch_to.default_content()
+                continue
+        
+        # 最终处理
+        print("\n最终处理...")
+        time.sleep(10)
+        
+        # 获取页面高度
+        page_height = driver.execute_script("""
+            return Math.max(
+                document.documentElement.scrollHeight,
+                document.body.scrollHeight
+            );
+        """)
+        
+        # 设置窗口大小
         driver.set_window_size(1920, page_height)
         
-        # 截取全页面图片
+        # 等待内容渲染
+        time.sleep(5)
+        
+        # 截图
         screenshot = driver.get_screenshot_as_png()
+        print("截图完成")
         
         # 转换为base64
         img_base64 = base64.b64encode(screenshot).decode('utf-8')
+        
         return {
             'success': True,
             'base64': img_base64,
@@ -47,6 +115,7 @@ def take_screenshot(driver, url, wait_time=10):
         }
         
     except Exception as e:
+        print(f"截图错误: {str(e)}")
         return {
             'success': False,
             'base64': '',
@@ -55,34 +124,29 @@ def take_screenshot(driver, url, wait_time=10):
 
 @app.route('/screenshot', methods=['POST'])
 def screenshot():
-    """
-    截图服务接口
-    
-    请求体JSON格式：
-    {
-        "url": "要截图的URL",
-        "wait_time": 10  // 可选，等待时间（秒）
-    }
-    """
+    """截图服务接口"""
     try:
-        data = request.get_json()
-        if not data or 'url' not in data:
+        # 读取配置文件
+        with open('config.test.yaml', 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+        
+        # 查找test123的配置
+        target = next((t for t in config['targets'] if t['name'] == 'test123'), None)
+        if not target:
             return jsonify({
                 'success': False,
-                'message': 'URL is required'
+                'message': 'test123 configuration not found'
             }), 400
             
-        url = data['url']
-        wait_time = data.get('wait_time', 10)
-        
         driver = init_driver()
         try:
-            result = take_screenshot(driver, url, wait_time)
+            result = take_screenshot(driver, target['url'])
             return jsonify(result)
         finally:
             driver.quit()
             
     except Exception as e:
+        print(f"服务错误: {str(e)}")
         return jsonify({
             'success': False,
             'message': f'Server error: {str(e)}'

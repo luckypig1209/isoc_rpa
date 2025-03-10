@@ -31,12 +31,15 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile.windows
+      dockerfile: Dockerfile.flask
+    ports:
+      - "25000:5000"
     volumes:
       - ./.history:/app/.history
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      - "cnioc.telecomjs.com:132.254.207.139"
 
   app-linux:
     build:
