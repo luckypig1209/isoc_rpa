@@ -14,8 +14,38 @@ targets:
           y: 200
           width: 750
           height: 680
+  - name: bigybiframe
+    url: http://132.254.207.139:38080/yitu/index.html#/chart/publishShort/5u6xbvxhmts000
+    open-wait-secs: 90
+    after-load-wait-secs: 10
+    elements-check:
+      - type: iframe
+        locator:
+          type: css-selector
+          value: "#h74i8m87jvc00 iframe"
+        wait-for-content: true
+        capture:
+          x: 570
+          y: 200
+          width: 750
+          height: 680
   - name: dsjiframe
     url: http://132.254.207.138:38080/yitu/index.html#/chart/publishShort/48ydcb79222000
+    open-wait-secs: 90
+    after-load-wait-secs: 10
+    elements-check:
+      - type: iframe
+        locator:
+          type: css-selector
+          value: "#h74i8m87jvc00 iframe"
+        wait-for-content: true
+        capture:
+          x: 570
+          y: 150
+          width: 750
+          height: 530
+  - name: bigdsjiframe
+    url: http://132.254.207.139:38080/yitu/index.html#/chart/publishShort/521k2hs8qh0000
     open-wait-secs: 90
     after-load-wait-secs: 10
     elements-check:

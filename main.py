@@ -35,7 +35,9 @@ NAME_MAPPINGS = {
     'gatiframe': '公安二级主干网络监控',
     'wltiframe': '省文旅厅监控项目派单统计',
     'gyiframe': '省高级人民法院',
-    'abaaba': '省医保信息系统感知平台'
+    'abaaba': '省医保信息系统感知平台',
+    'bigybiframe': '医保局网络监控大屏',
+    'bigdsjiframe': '电子政务外网监控大屏'
 }
 
 class VideoLoaded:
@@ -581,6 +583,34 @@ def send_message_to_dingding(message: str, robot_id: str):
             else:
                 print(f"发送消息最终失败，已达到最大重试次数")
 
+def send_sms_alert(message: str):
+    """发送短信告警"""
+    # 定义需要发送的手机号列表
+    phone_numbers = [
+        "17315040301",
+        "15366181470",
+        "18951603576"
+    ]
+    
+    # 逐个发送短信
+    for phone in phone_numbers:
+        try:
+            url = "https://cnioc.telecomjs.com:18080/serv/atom-center/atom/v1.0/atom_center/CQT_SmsGateway"
+            headers = {
+                "app-key": "8C6B07CEF3529B16D890B6FACA8F6A3C",
+                "staffCode": "HX_XUZ"
+            }
+            body = {
+                "num": phone,
+                "content": message
+            }
+            
+            resp = requests.post(url, headers=headers, json=body, verify=False)
+            print(f"短信发送响应 (to {phone}): {resp.text}")
+            
+        except Exception as e:
+            print(f"发送短信失败 (to {phone}): {str(e)}")
+
 # 主执行流程修改
 results = {}  # 存储所有结果
 for target in config_data["targets"]:
@@ -619,6 +649,9 @@ if results:
         DinghatSendImg(combined_b64_ding, "1183")
         send_message_to_dingding(summary_message, "1183")
         
+        # 同时发送汇总消息到短信
+        #send_sms_alert(summary_message)
+        
         # 检查是否有需要告警的情况（排除wltiframe）
         alert_needed = any(
             target_name != 'wltiframe' and 
@@ -629,7 +662,7 @@ if results:
         
         if alert_needed:
             # 发送告警消息和图片到1098群
-            DinghatSendImg(combined_b64_ding, "1098")
+            #DinghatSendImg(combined_b64_ding, "1098")
             alert_message = "⚠️ 警告：检测到以下页面发生重大变化：\n"
             for target_name, result in results.items():
                 if target_name != 'wltiframe' and 'similarity' in result and result['similarity'] < 0.7:
@@ -639,6 +672,7 @@ if results:
                     alert_message += f"- 加载耗时: {result['load_time']:.2f}秒\n"
             
             send_message_to_dingding(alert_message, "1098")
+            send_sms_alert(alert_message)
 
 driver.quit()
 
