@@ -27,6 +27,19 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 cfg_file_path = "config.test.yaml"
 
+# 添加名称映射字典
+NAME_MAPPINGS = {
+    'ybiframe': '医保局网络监控',
+    'dsjiframe': '电子政务外网监控',
+    'tciframe': '江苏体彩智能网络监控',
+    'gatiframe': '公安二级主干网络监控',
+    'wltiframe': '省文旅厅监控项目派单统计',
+    'gyiframe': '省高级人民法院',
+    'abaaba': '省医保信息系统感知平台',
+    'bigybiframe': '医保局网络监控大屏',
+    'bigdsjiframe': '电子政务外网监控大屏'
+}
+
 class VideoLoaded:
     def __init__(self, locator):
         self.locator = locator
@@ -54,14 +67,91 @@ class IframeLoaded:
         self.locator = locator
 
     def __call__(self, driver):
-        element = driver.find_element(*self.locator)
-        driver.switch_to.frame(element)
-        body_element = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-        result = driver.execute_script("return arguments[0].getAttribute('style');", body_element)
-        body_style = body_element.get_attribute("style")
-        print(result, body_style)
-        driver.switch_to.default_content()
-        return result is not None
+        try:
+            print("等待 iframe 出现...")
+            # 特别处理电子政务外网监控大屏
+            if "521k2hs8qh0000" in driver.current_url:  # 电子政务外网监控大屏的URL特征
+                time.sleep(10)  # 增加初始等待时间
+            else:
+                time.sleep(3)
+            
+            print(f"尝试查找: {self.locator[1]}")
+            element = driver.find_element(*self.locator)
+            if not element:
+                print("未找到 iframe")
+                return False
+                
+            print("找到 iframe，等待内容加载...")
+            
+            # 切换到 iframe
+            driver.switch_to.frame(element)
+            
+            try:
+                # 等待 iframe 内容加载
+                body_element = WebDriverWait(driver, 30).until(  # 增加等待时间到30秒
+                    EC.presence_of_element_located((By.TAG_NAME, "body"))
+                )
+                
+                # 等待页面完全加载
+                WebDriverWait(driver, 30).until(  # 增加等待时间到30秒
+                    lambda d: d.execute_script("return document.readyState") == "complete"
+                )
+                
+                # 特别处理电子政务外网监控大屏
+                if "521k2hs8qh0000" in driver.current_url:
+                    # 检查特定元素是否存在并可见
+                    charts = driver.find_elements(By.CSS_SELECTOR, ".chart-wrap, canvas, svg")
+                    if not charts:
+                        print("未找到图表元素")
+                        return False
+                    
+                    # 确保至少有一个图表元素可见
+                    is_visible = any(
+                        driver.execute_script(
+                            "return (arguments[0].offsetWidth > 0 && arguments[0].offsetHeight > 0) || " +
+                            "(arguments[0].getBoundingClientRect().width > 0 && arguments[0].getBoundingClientRect().height > 0);",
+                            chart
+                        )
+                        for chart in charts
+                    )
+                    
+                    if not is_visible:
+                        print("图表元素未显示")
+                        return False
+                    
+                    # 额外等待确保图表渲染
+                    time.sleep(5)
+                
+                # 检查 iframe 是否有实际内容
+                content_elements = driver.find_elements(By.CSS_SELECTOR, "div, canvas, svg, .chart-wrap")
+                has_content = len(content_elements) > 0
+                
+                if has_content:
+                    print(f"找到 {len(content_elements)} 个内容元素")
+                    time.sleep(5)  # 增加等待时间
+                else:
+                    print("未找到内容元素")
+                
+                # 切回主文档
+                driver.switch_to.default_content()
+                return has_content
+                
+            finally:
+                # 确保切回主文档
+                driver.switch_to.default_content()
+                
+        except Exception as e:
+            print(f"Iframe load check failed: {str(e)}")
+            # 打印更多调试信息
+            print("当前页面 URL:", driver.current_url)
+            try:
+                all_iframes = driver.find_elements(By.TAG_NAME, "iframe")
+                print("页面中的所有 iframe 数量:", len(all_iframes))
+                for idx, iframe in enumerate(all_iframes):
+                    print(f"iframe {idx} id:", iframe.get_attribute("id"))
+            except:
+                pass
+            return False
 
 # load config
 try:
@@ -78,12 +168,21 @@ except yaml.YAMLError as e:
 
 
 options = OptionsChrome()
-
-# options.headless = True
-# options.add_argument("--headless=new")
-options = OptionsChrome()
+options.add_argument('--headless=new')
+options.add_argument('--no-sandbox')
+options.add_argument('--disable-dev-shm-usage')
+options.add_argument('--disable-gpu')
+options.add_argument('--start-maximized')  # 最大化窗口
+options.add_argument('--window-size=1920,1080')  # 设置固定窗口大小
+options.add_argument('--hide-scrollbars')  # 隐藏滚动条
 options.add_argument('--ignore-certificate-errors')
-driver = webdriver.Chrome(service=Service(executable_path="C:\\Mac\\Home\\Desktop\\isoc_rpa\\chromedriver.exe"), options=options)
+options.binary_location = '/usr/bin/chromium'  # 指定 Chromium 位置
+
+# 使用 ChromeDriver 的路径
+driver = webdriver.Chrome(
+    options=options,
+    service=Service('/usr/bin/chromedriver')  # 指定 chromedriver 路径
+)
 
 def cleanup_old_backups(history_dir: str, days: int = 5):
     """清理指定天数之前的备份文件"""
@@ -120,162 +219,133 @@ backup_dir = os.path.join(os.getcwd(), '.history', timestamp)
 if not os.path.exists(backup_dir):
     os.makedirs(backup_dir)
 
+def get_element_dimensions(driver, element):
+    """获取元素的实际位置和大小"""
+    return driver.execute_script("""
+        var rect = arguments[0].getBoundingClientRect();
+        return {
+            x: rect.left,
+            y: rect.top,
+            width: rect.width,
+            height: rect.height
+        };
+    """, element)
+
 def take_screenshot(driver, target: any) -> tuple[bool, str, str, str, str, float]:
-    """
-    尝试加载页面并截图
-    返回：(是否成功, 全页面微信base64图片, 全页面钉钉base64图片, iframe微信base64图片, iframe钉钉base64图片, 加载耗时)
-    """
     try:
-        target_name = target["name"]
-        target_url = target["url"]
-        open_wait_sec = target["open-wait-secs"]
-        elements = target["elements-check"]
-        ready_conds = []
-        visible_conds = []
-        iframe_element = None
+        target_name = target['name']
+        url = target['url']
+        open_wait_secs = target.get('open-wait-secs', 10)
+        after_load_wait_secs = target.get('after-load-wait-secs', 0)  # 新增配置项
+        elements_check = target.get('elements-check', [])
         
-        if elements is not None and elements:
-            for item in elements:
-                checktype = item["type"]
-                locator = item["locator"]
-                locator_type = locator["type"]
-                locator_val = locator["value"]
-                loc = ()
-                if locator_type == "css-selector":
-                    loc = (By.CSS_SELECTOR, locator_val)
-                    visible_conds.append(EC.visibility_of_all_elements_located(loc))
-                    if checktype == "iframe":
-                        iframe_element = loc
-                elif locator_type == "id":
-                    loc = (By.ID, locator_val)
-                    visible_conds.append(EC.visibility_of_all_elements_located(loc))
-                elif locator_type == "xpath":
-                    loc = (By.XPATH, locator_val)
-                    visible_conds.append(EC.visibility_of_all_elements_located(loc))
-                
-                if checktype == "video":
-                    ready_conds.append(VideoLoaded(loc))
-                elif checktype == "iframe":
-                    ready_conds.append(IframeLoaded(loc))
-                elif checktype == "element":
-                    ready_conds.append(ElementLoaded(loc))
-
-        # 记录开始加载时间
+        print(f"\n开始处理目标: {target_name}")
+        print(f"访问URL: {url}")
+        
         start_time = time.time()
+        driver.get(url)
+        print(f"页面加载完成，耗时: {time.time() - start_time:.2f}秒")
         
-        # 增加页面加载超时处理
-        driver.set_page_load_timeout(30)  # 设置页面加载超时时间为30秒
-        
-        # 增加详细的错误日志
-        print(f"开始加载页面: {target_url}")
-        driver.get(target_url)
-        print(f"页面加载完成: {target_url}")
-
-        # 等待元素可见
-        visible_wait = WebDriverWait(driver, open_wait_sec)
-        for cond in visible_conds:
-            visible_wait.until(cond)
-
-        # 等待元素就绪
-        ready_wait = WebDriverWait(driver, 30)
-        for cond in ready_conds:
-            ready_wait.until(cond)
+        # 等待页面加载
+        if elements_check:  # 只有在有elements_check时才执行等待
+            for element_check in elements_check:
+                element_type = element_check['type']
+                locator = element_check['locator']
+                locator_type = locator['type']
+                locator_val = locator['value']
+                
+                # 转换定位器类型
+                by_type = getattr(By, locator_type.replace('-', '_').upper())
+                
+                # 等待元素出现
+                ready_wait = WebDriverWait(driver, open_wait_secs)
+                
+                if element_type == 'video':
+                    cond = VideoLoaded((by_type, locator_val))
+                elif element_type == 'iframe':
+                    cond = IframeLoaded((by_type, locator_val))
+                else:
+                    cond = ElementLoaded((by_type, locator_val))
+                
+                ready_wait.until(cond)
+        else:
+            print("无需等待特定元素，直接截图")
+            time.sleep(open_wait_secs)  # 使用配置的等待时间
             
+            if after_load_wait_secs > 0:  # 如果配置了额外等待时间
+                print(f"额外等待 {after_load_wait_secs} 秒...")
+                time.sleep(after_load_wait_secs)
+        
         # 等待渲染完成
-        time.sleep(5)
+        print("等待渲染完成...")
+        time.sleep(2)
         
-        # 计算加载时间（秒）
-        load_time = time.time() - start_time - 5
-        print(f"Page load time for {target_name}: {load_time:.2f} seconds")
+        # 重置滚动位置
+        driver.execute_script('window.scrollTo(0, 0);')
+        print("页面滚动重置完成")
         
-        # 全页面截图
+        # 获取全页面截图
+        print("开始截取全页面...")
         full_img = driver.get_screenshot_as_png()
         full_b64_wx = base64.b64encode(full_img).decode('utf-8')
         full_b64_ding = "data:image/png;base64," + full_b64_wx
-
-        # 发送全页面截图到钉钉
-        # DinghatSendImg(full_b64_ding, "1183")
+        print("全页面截图完成")
         
-        # iframe部分截图
+        # 如果没有 elements_check，直接返回全页面截图
+        if not elements_check:
+            return True, full_b64_wx, full_b64_ding, full_b64_wx, full_b64_ding, time.time() - start_time
+            
+        # 初始化iframe截图的base64字符串
         iframe_b64_wx = ""
         iframe_b64_ding = ""
-        if iframe_element:
-            try:
-                # 获取配置的截图区域
-                capture_config = None
-                for item in elements:
-                    if item["type"] == "iframe":
-                        capture_config = item.get("capture")
-                        break
+        
+        try:
+            for element_check in elements_check:
+                capture_config = element_check.get('capture')
                 
                 if capture_config:
-                    # 使用配置的区域进行截图
+                    # 打印页面信息
+                    window_size = driver.get_window_size()
+                    scroll_position = driver.execute_script('return {x: window.pageXOffset, y: window.pageYOffset};')
+                    print(f"Window size: {window_size}")
+                    print(f"Scroll position: {scroll_position}")
+                    
+                    # 使用绝对定位
+                    capture_coords = {
+                        'x': round(float(capture_config['x'])),
+                        'y': round(float(capture_config['y'])),
+                        'width': round(float(capture_config['width'])),
+                        'height': round(float(capture_config['height']))
+                    }
+                    
+                    print(f"Capturing {target_name} at: {capture_coords}")
+                    
                     full_image = Image.open(io.BytesIO(full_img))
                     
-                    # 确保坐标值为整数，并保持精确的位置
-                    x = round(float(capture_config['x']))
-                    y = round(float(capture_config['y']))
-                    width = round(float(capture_config['width']))
-                    height = round(float(capture_config['height']))
-                    
-                    print(f"Cropping image for {target_name} at: x={x}, y={y}, width={width}, height={height}")
-                    
+                    # 裁剪图片
                     iframe_image = full_image.crop((
-                        x,
-                        y,
-                        x + width,
-                        y + height
+                        capture_coords['x'],
+                        capture_coords['y'],
+                        capture_coords['x'] + capture_coords['width'],
+                        capture_coords['y'] + capture_coords['height']
                     ))
                     
                     # 转换为base64
-                    img_byte_arr = io.BytesIO()
-                    iframe_image.save(img_byte_arr, format='PNG')
-                    img_byte_arr = img_byte_arr.getvalue()
-                    
-                    iframe_b64_wx = base64.b64encode(img_byte_arr).decode('utf-8')
+                    buffered = io.BytesIO()
+                    iframe_image.save(buffered, format="PNG")
+                    iframe_b64_wx = base64.b64encode(buffered.getvalue()).decode('utf-8')
                     iframe_b64_ding = "data:image/png;base64," + iframe_b64_wx
                     
-                    # 发送 iframe 截图到钉钉
-                    # DinghatSendImg(iframe_b64_ding, "1098")
-                    
-                else:
-                    # 使用JavaScript方法获取位置（作为后备方案）
-                    iframe = driver.find_image(*iframe_element)
-                    rect = driver.execute_script("""
-                        var rect = arguments[0].getBoundingClientRect();
-                        return {
-                            x: rect.left + window.pageXOffset,
-                            y: rect.top + window.pageYOffset,
-                            width: rect.width,
-                            height: rect.height
-                        };
-                    """, iframe)
-                    
-                    iframe_image = full_image.crop((
-                        int(rect['x']),
-                        int(rect['y']),
-                        int(rect['x'] + rect['width']),
-                        int(rect['y'] + rect['height'])
-                    ))
-                
-                # 转换回bytes
-                img_byte_arr = io.BytesIO()
-                iframe_image.save(img_byte_arr, format='PNG')
-                img_byte_arr = img_byte_arr.getvalue()
-                
-                iframe_b64_wx = base64.b64encode(img_byte_arr).decode('utf-8')
-                iframe_b64_ding = "data:image/png;base64," + iframe_b64_wx
-                
-            except Exception as e:
-                print(f"iframe截图失败: {str(e)}")
+        except Exception as e:
+            print(f"iframe截图失败: {str(e)}")
         
-        return True, full_b64_wx, full_b64_ding, iframe_b64_wx, iframe_b64_ding, load_time
+        return True, full_b64_wx, full_b64_ding, iframe_b64_wx, iframe_b64_ding, time.time() - start_time
         
     except Exception as e:
-        print(f"Screenshot failed for {target['name']}: {str(e)}")
+        print(f"处理失败: {target_name}")
         print(f"Error type: {type(e).__name__}")
         print(f"Error details: {e.args}")
-        return False, "", "", "", "", 0.0
+        return False, "", "", "", "", 0
 
 def WechatSendImg(b64Img: str, level: str):
     """发送图片到微信"""
@@ -471,8 +541,8 @@ def screenshot_it(target: any, results: dict):
                     'load_time': load_time
                 }
                 
-                # 如果有iframe截图，保存并进行比较
-                if iframe_b64_wx:
+                # 如果有iframe截图且不是wltiframe，保存并进行比较
+                if iframe_b64_wx and target_name != 'wltiframe':
                     print(f"保存 iframe 截图: {target_name}")
                     iframe_screenshot_path = os.path.join(backup_dir, f'{target_name}_iframe.png')
                     with open(iframe_screenshot_path, 'wb') as f:
@@ -539,6 +609,34 @@ def send_message_to_dingding(message: str, robot_id: str):
             else:
                 print(f"发送消息最终失败，已达到最大重试次数")
 
+def send_sms_alert(message: str):
+    """发送短信告警"""
+    # 定义需要发送的手机号列表
+    phone_numbers = [
+        "17315040301",
+        "15366181470",
+        "18951603576"
+    ]
+    
+    # 逐个发送短信
+    for phone in phone_numbers:
+        try:
+            url = "https://cnioc.telecomjs.com:18080/serv/atom-center/atom/v1.0/atom_center/CQT_SmsGateway"
+            headers = {
+                "app-key": "8C6B07CEF3529B16D890B6FACA8F6A3C",
+                "staffCode": "HX_XUZ"
+            }
+            body = {
+                "num": phone,
+                "content": message
+            }
+            
+            resp = requests.post(url, headers=headers, json=body, verify=False)
+            print(f"短信发送响应 (to {phone}): {resp.text}")
+            
+        except Exception as e:
+            print(f"发送短信失败 (to {phone}): {str(e)}")
+
 # 主执行流程修改
 results = {}  # 存储所有结果
 for target in config_data["targets"]:
@@ -562,9 +660,11 @@ if results:
         # 构建汇总消息
         summary_message = "监控结果汇总：\n"
         for target_name, result in results.items():
-            summary_message += f"\n{target_name}:\n"
+            display_name = NAME_MAPPINGS.get(target_name, target_name)  # 获取映射名称
+            summary_message += f"\n{display_name}:\n"
             summary_message += f"- 加载耗时: {result['load_time']:.2f}秒\n"
-            if 'similarity' in result:
+            # 只为非wltiframe目标添加相似度信息
+            if target_name != 'wltiframe' and 'similarity' in result:
                 similarity = result['similarity']
                 summary_message += f"- 相似度: {similarity:.2f}"
                 if similarity < 0.7:
@@ -575,23 +675,30 @@ if results:
         DinghatSendImg(combined_b64_ding, "1183")
         send_message_to_dingding(summary_message, "1183")
         
-        # 检查是否有需要告警的情况
+        # 同时发送汇总消息到短信
+        #send_sms_alert(summary_message)
+        
+        # 检查是否有需要告警的情况（排除wltiframe）
         alert_needed = any(
-            'similarity' in result and result['similarity'] < 0.7 
-            for result in results.values()
+            target_name != 'wltiframe' and 
+            'similarity' in result and 
+            result['similarity'] < 0.7 
+            for target_name, result in results.items()
         )
         
         if alert_needed:
             # 发送告警消息和图片到1098群
-            DinghatSendImg(combined_b64_ding, "1098")
+            #DinghatSendImg(combined_b64_ding, "1098")
             alert_message = "⚠️ 警告：检测到以下页面发生重大变化：\n"
             for target_name, result in results.items():
-                if 'similarity' in result and result['similarity'] < 0.7:
-                    alert_message += f"\n{target_name}:\n"
+                if target_name != 'wltiframe' and 'similarity' in result and result['similarity'] < 0.7:
+                    display_name = NAME_MAPPINGS.get(target_name, target_name)  # 获取映射名称
+                    alert_message += f"\n{display_name}:\n"
                     alert_message += f"- ✅相似度: {result['similarity']:.2f}\n"
                     alert_message += f"- 加载耗时: {result['load_time']:.2f}秒\n"
             
             send_message_to_dingding(alert_message, "1098")
+            send_sms_alert(alert_message)
 
 driver.quit()
 

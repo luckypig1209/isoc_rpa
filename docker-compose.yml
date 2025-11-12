@@ -1,0 +1,50 @@
+version: '3'
+services:
+  isoc-arm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - HTTP_PROXY=${HTTP_PROXY}
+        - HTTPS_PROXY=${HTTPS_PROXY}
+        - ALL_PROXY=${ALL_PROXY}
+    platform: linux/arm64
+    container_name: isoc-arm
+    volumes:
+      - .:/app
+    tty: true
+
+  isoc-amd64:
+    build:
+      context: .
+      dockerfile: Dockerfile.amd64
+      args:
+        - HTTP_PROXY=${HTTP_PROXY}
+        - HTTPS_PROXY=${HTTPS_PROXY}
+        - ALL_PROXY=${ALL_PROXY}
+    platform: linux/amd64
+    container_name: isoc-amd64
+    volumes:
+      - .:/app
+    tty: true
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.flask
+    ports:
+      - "25000:5000"
+    volumes:
+      - ./.history:/app/.history
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "cnioc.telecomjs.com:132.254.207.139"
+
+  app-linux:
+    build:
+      context: .
+      dockerfile: Dockerfile.linux
+    volumes:
+      - ./.history:/app/.history
+    restart: unless-stopped 
