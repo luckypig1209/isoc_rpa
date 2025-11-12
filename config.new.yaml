@@ -1,0 +1,16 @@
+targets:
+  - name: new_chart
+    url: http://177.11.176.11:23343/yitu/#/chart/publishShort/4ujd3lwbaow000
+    open-wait-secs: 60
+    after-load-wait-secs: 10
+    elements-check:
+      - type: iframe
+        locator:
+          type: css-selector
+          value: "#h74i8m87jvc00 iframe"
+        wait-for-content: true
+        capture:
+          x: 570
+          y: 200
+          width: 750
+          height: 680 

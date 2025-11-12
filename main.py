@@ -69,10 +69,12 @@ class IframeLoaded:
     def __call__(self, driver):
         try:
             print("等待 iframe 出现...")
-            # 先等待一段时间让页面加载
-            time.sleep(3)  # 增加初始等待时间
+            # 特别处理电子政务外网监控大屏
+            if "521k2hs8qh0000" in driver.current_url:  # 电子政务外网监控大屏的URL特征
+                time.sleep(10)  # 增加初始等待时间
+            else:
+                time.sleep(3)
             
-            # 尝试查找 iframe
             print(f"尝试查找: {self.locator[1]}")
             element = driver.find_element(*self.locator)
             if not element:
@@ -86,14 +88,39 @@ class IframeLoaded:
             
             try:
                 # 等待 iframe 内容加载
-                body_element = WebDriverWait(driver, 20).until(
+                body_element = WebDriverWait(driver, 30).until(  # 增加等待时间到30秒
                     EC.presence_of_element_located((By.TAG_NAME, "body"))
                 )
                 
                 # 等待页面完全加载
-                WebDriverWait(driver, 20).until(
+                WebDriverWait(driver, 30).until(  # 增加等待时间到30秒
                     lambda d: d.execute_script("return document.readyState") == "complete"
                 )
+                
+                # 特别处理电子政务外网监控大屏
+                if "521k2hs8qh0000" in driver.current_url:
+                    # 检查特定元素是否存在并可见
+                    charts = driver.find_elements(By.CSS_SELECTOR, ".chart-wrap, canvas, svg")
+                    if not charts:
+                        print("未找到图表元素")
+                        return False
+                    
+                    # 确保至少有一个图表元素可见
+                    is_visible = any(
+                        driver.execute_script(
+                            "return (arguments[0].offsetWidth > 0 && arguments[0].offsetHeight > 0) || " +
+                            "(arguments[0].getBoundingClientRect().width > 0 && arguments[0].getBoundingClientRect().height > 0);",
+                            chart
+                        )
+                        for chart in charts
+                    )
+                    
+                    if not is_visible:
+                        print("图表元素未显示")
+                        return False
+                    
+                    # 额外等待确保图表渲染
+                    time.sleep(5)
                 
                 # 检查 iframe 是否有实际内容
                 content_elements = driver.find_elements(By.CSS_SELECTOR, "div, canvas, svg, .chart-wrap")
@@ -101,8 +128,7 @@ class IframeLoaded:
                 
                 if has_content:
                     print(f"找到 {len(content_elements)} 个内容元素")
-                    # 额外等待确保图表渲染完成
-                    time.sleep(2)
+                    time.sleep(5)  # 增加等待时间
                 else:
                     print("未找到内容元素")
                 

@@ -47,7 +47,7 @@ targets:
   - name: bigdsjiframe
     url: http://132.254.207.139:38080/yitu/index.html#/chart/publishShort/521k2hs8qh0000
     open-wait-secs: 90
-    after-load-wait-secs: 10
+    after-load-wait-secs: 15
     elements-check:
       - type: iframe
         locator:
