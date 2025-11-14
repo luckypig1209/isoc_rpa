@@ -1,0 +1,19 @@
+version: '3'
+services:
+  screenshot-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "25000:5000"
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai
+    # 可选：设置资源限制
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+

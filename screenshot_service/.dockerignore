@@ -1,0 +1,21 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+.git
+.gitignore
+README.md
+QUICKSTART.md
+.env
+.venv
+venv/
+ENV/
+# 保留 static 目录（需要打包到镜像中）
+# static/
+
